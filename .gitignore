@@ -1,0 +1,7 @@
+#
+.metadata/
+.settings/
+
+# build
+Debug/
+Release/
