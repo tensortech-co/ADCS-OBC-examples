@@ -4,10 +4,13 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#define BUFF_SIZE 1029
+
 typedef enum
 {
     VERIFY_HEADER,
-    WAIT_UNTIL_CHECKSUM
+    FIND_MSG_TYPE,
+    WAIT_UNTIL_CHECKSUM,
 } TtParserState;
 
 typedef enum
@@ -23,14 +26,15 @@ typedef struct
     TtParserState state;
     uint16_t current_index;
     uint16_t next_index;
-    uint8_t checksum;
+    uint16_t msg_start_index;
+    uint16_t msg_end_index;
 }TtTracker;
 
 typedef struct 
 {
     uint8_t factory_id;
     TtMsgType type;
-    uint8_t msg[1029];
+    uint8_t msg[BUFF_SIZE];
     TtTracker tracker;
 } TtParser;
 
@@ -38,8 +42,7 @@ typedef struct
 void TtParserInit(TtParser* parser, uint8_t factory_id);
 bool TtParserUpdate(TtParser *parser, const uint8_t c);
 TtMsgType TtParserGetMsgType(TtParser *parser);
-bool TtParserGetRequestInfo(TtParser *parser, uint8_t* map_id, uint8_t* reg_id, uint8_t* word_count);
-bool TtParserGetResponseInfo(TtParser *parser, uint8_t *map_id, uint8_t *reg_id, uint8_t *word_count);
+void TtParserGetHeaderInfo(TtParser *parser, uint8_t* map_id, uint8_t* reg_id, uint8_t* word_count);
 void TtParserCopyMsgBody(TtParser *parser, void *dest);
 
 #endif // TT_PARSER_H_

@@ -18,7 +18,7 @@
 // private variable
 static reg_adcs register_adcs;
 static TtParser parser;
-static uint8_t rx_buffer[5];
+static uint8_t rx_buffer;
 
 // private function declare
 
@@ -42,16 +42,11 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 	uint8_t reg_id;
 	if (huart->Instance == USART2)
 	{
-		for (uint8_t i = 0; i < 5; i++)
+		if (TtParserUpdate(&parser, rx_buffer))
 		{
-			if (!TtParserUpdate(&parser, rx_buffer[i]))
-			{
-				continue;
-			}
-
 			if (READ_RESPONSE == TtParserGetMsgType(&parser))
 			{
-				TtParserGetRequestInfo(&parser, &map_id, &reg_id, &word_count);
+				TtParserGetHeaderInfo(&parser, &map_id, &reg_id, &word_count);
 				switch(map_id)
 				{
 				case 0:
@@ -66,7 +61,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 				}
 			}
 		}
-		HAL_UART_Receive_IT(huart, rx_buffer, 5); // You need to toggle a breakpoint on this line!
+		HAL_UART_Receive_IT(huart, &rx_buffer, 1); // You need to toggle a breakpoint on this line!
 	}
 }
 
@@ -75,20 +70,18 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 void BspAdcsInit()
 {
 	TtParserInit(&parser, 0x64);
-	HAL_UART_Receive_IT(&huart2, rx_buffer, 5);
+	HAL_UART_Receive_IT(&huart2, &rx_buffer, 1);
 }
 
 void BspAdcsTask()
 {
 	// User map
-	uint8_t read_request[5] = {0xc9, 0x00, 0xA2, 0x00, 0x95};
-//	HAL_UART_Transmit_IT(&huart2,  read_request, 5);
-//	HAL_Delay(200);
+	uint8_t read_request1[5] = {0xc9, 0x00, 0xA2, 0x00, 0x95};
+	HAL_UART_Transmit_IT(&huart2,  read_request1, 5);
+	HAL_Delay(200);
 	// Sensor/ Actuator map
-	read_request[2]= 0x62;
-	read_request[3] = 0x10;
-	read_request[4] = 0xc5;
-	HAL_UART_Transmit_IT(&huart2,  read_request, 5);
+	uint8_t read_request2[5] = {0xc9, 0x00, 0x62, 0x10, 0xc5};
+	HAL_UART_Transmit_IT(&huart2,  read_request2, 5);
 	HAL_Delay(200);
 }
 

@@ -1,13 +1,11 @@
 #include "tt_parser.h"
 #include <string.h>
-#include <stdio.h>
 
 // define
 #define HEADER_HEAD_INDEX 0
 #define HEADER_REG_INDEX 1
 #define HEADER_WORD_COUNT_INDEX 2
 #define HEADER_MAP_ERR_INDEX 3
-#define MSG_BODY_START_INDEX 4
 
 // typedef
 // private variable
@@ -17,16 +15,16 @@
 void resetTtParser(TtParser *parser);
 void resetTtTracker(TtTracker *tracker);
 bool verifyHeader(TtParser *parser);
-void computeChecksum(TtParser *parser, uint8_t c);
-void addMessageByte(TtParser *parser, uint8_t c);
+void checkMessageType(TtParser *parser);
+bool verifyCheckSum(uint8_t *bytes, uint16_t start_index, uint16_t len);
 bool matchChecksum(TtParser *parser);
-void updateMsgType(TtParser *parser);
+void addMessageByte(TtParser *parser, uint8_t c);
 
 // private function implement
 
 void resetTtParser(TtParser *parser)
 {
-    memset(parser->msg, 0x00, 1029);
+    memset(parser->msg, 0x00, BUFF_SIZE);
     resetTtTracker(&parser->tracker);
 }
 
@@ -34,7 +32,6 @@ void resetTtTracker(TtTracker *tracker)
 {
     tracker->current_index = 0;
     tracker->next_index = 0;
-    tracker->checksum = 0x00;
     tracker->state = VERIFY_HEADER;
 }
 
@@ -42,54 +39,88 @@ bool verifyHeader(TtParser *parser)
 {
     TtTracker *tracker = &parser->tracker;
 
-    if (tracker->current_index < HEADER_MAP_ERR_INDEX)
-    {
-        return false;
-    }
+    uint16_t header_1st_index = (parser->tracker.current_index - 3 + BUFF_SIZE) % BUFF_SIZE;
+    uint16_t header_4th_index = (parser->tracker.current_index - 0 + BUFF_SIZE) % BUFF_SIZE;
 
-    uint8_t head = parser->msg[HEADER_HEAD_INDEX];
-    uint8_t error = parser->msg[HEADER_MAP_ERR_INDEX] & 0x0F;
+    uint8_t head = parser->msg[header_1st_index];
+    uint8_t error = parser->msg[header_4th_index] & 0x0F;
 
     if ((head >> 1) != parser->factory_id)
         return false;
     if (error != 0)
         return false;
 
+    tracker->msg_start_index = header_1st_index;
     return true;
 }
 
-void computeChecksum(TtParser *parser, uint8_t c)
+void checkMessageType(TtParser *parser)
 {
-    parser->tracker.checksum += c;
+    TtTracker *tracker = &parser->tracker;
+
+    uint16_t header_1st_index = tracker->msg_start_index;
+    uint16_t header_3rd_index = (header_1st_index + 2) % BUFF_SIZE;
+    uint8_t is_read = (parser->msg[header_1st_index] & 1);
+    uint8_t word_count = parser->msg[header_3rd_index];
+
+    if (verifyCheckSum(parser->msg, header_1st_index, 5))
+    {
+        parser->type = (is_read == 1) ? READ_REQUEST : WRITE_RESPONSE;
+        tracker->msg_end_index = (header_1st_index + 4) % BUFF_SIZE;
+    }
+    else
+    {
+        parser->type = (is_read == 1) ? READ_RESPONSE : WRITE_REQUEST;
+        tracker->msg_end_index = (header_1st_index + (word_count + 1) * 4) % BUFF_SIZE;
+    }
 }
 
-void addMessageByte(TtParser *parser, uint8_t c)
+bool verifyCheckSum(uint8_t *bytes, uint16_t start_index, uint16_t len)
 {
-    parser->msg[parser->tracker.current_index] = c;
-    parser->tracker.next_index++;
-}
-
-bool matchChecksum(TtParser *parser)
-{
-    if (parser->tracker.checksum == 0)
+    uint8_t checksum = 0x00;
+    uint16_t index = start_index;
+    for (uint16_t i = 0; i < len; i++)
+    {
+        checksum += bytes[index];
+        index++;
+        if (index >= BUFF_SIZE)
+        {
+            index = 0;
+        }
+    }
+    if (checksum == 0)
     {
         return true;
     }
     return false;
 }
 
-void updateMsgType(TtParser *parser)
+bool matchChecksum(TtParser *parser)
 {
-    uint8_t is_read = (parser->msg[HEADER_HEAD_INDEX] & 1);
-    uint16_t msg_length = parser->tracker.current_index - MSG_BODY_START_INDEX;
+    TtTracker *tracker = &parser->tracker;
+    uint16_t header_1st_index = tracker->msg_start_index;
+    uint16_t header_3rd_index = (header_1st_index + 2) % BUFF_SIZE;
+    uint8_t word_count = parser->msg[header_3rd_index];
 
-    if (msg_length == 0)
+    uint16_t msg_length = ((uint16_t)word_count + 1) * 4 + 1;
+    if (tracker->current_index == tracker->msg_end_index)
     {
-        parser->type = (is_read == 1) ? READ_REQUEST : WRITE_RESPONSE;
+        if (verifyCheckSum(parser->msg, header_1st_index, msg_length))
+        {
+            return true;
+        }
     }
-    else
+    return false;
+}
+
+void addMessageByte(TtParser *parser, uint8_t c)
+{
+    parser->msg[parser->tracker.current_index] = c;
+    parser->tracker.next_index++;
+
+    if (parser->tracker.next_index >= BUFF_SIZE)
     {
-        parser->type = (is_read == 1) ? READ_RESPONSE : WRITE_REQUEST;
+        parser->tracker.next_index = 0;
     }
 }
 
@@ -107,24 +138,38 @@ bool TtParserUpdate(TtParser *parser, const uint8_t c)
     bool has_checksum = false;
 
     addMessageByte(parser, c);
-    computeChecksum(parser, c);
 
     if (state == VERIFY_HEADER)
     {
         if (verifyHeader(parser))
+        {
+            parser->tracker.state = FIND_MSG_TYPE;
+        }
+    }
+    else if (state == FIND_MSG_TYPE)
+    {
+        checkMessageType(parser);
+        if (parser->type == READ_REQUEST ||
+            parser->type == WRITE_RESPONSE)
+        {
+            has_checksum = true;
+        }
+        else if (parser->type == WRITE_REQUEST ||
+                 parser->type == READ_RESPONSE)
         {
             parser->tracker.state = WAIT_UNTIL_CHECKSUM;
         }
     }
     else if (state == WAIT_UNTIL_CHECKSUM)
     {
-
-        has_checksum = matchChecksum(parser);
+        if (matchChecksum(parser))
+        {
+            has_checksum = true;
+        }
     }
 
     if (has_checksum)
     {
-        updateMsgType(parser);
         resetTtTracker(&parser->tracker);
         return true;
     }
@@ -139,34 +184,11 @@ TtMsgType TtParserGetMsgType(TtParser *parser)
     return parser->type;
 }
 
-bool TtParserGetRequestInfo(TtParser *parser, uint8_t *map_id, uint8_t *reg_id, uint8_t *word_count)
+void TtParserGetHeaderInfo(TtParser *parser, uint8_t *map_id, uint8_t *reg_id, uint8_t *word_count)
 {
-    if (parser->type != READ_REQUEST &&
-        parser->type != WRITE_REQUEST)
-    {
-        return false;
-    }
-
     *reg_id = parser->msg[HEADER_REG_INDEX];
     *word_count = parser->msg[HEADER_WORD_COUNT_INDEX];
     *map_id = (parser->msg[HEADER_MAP_ERR_INDEX] & 0xF0) >> 4;
-
-    return true;
-}
-
-bool TtParserGetResponseInfo(TtParser *parser, uint8_t *map_id, uint8_t *reg_id, uint8_t *word_count)
-{
-    if (parser->type != READ_RESPONSE &&
-        parser->type != WRITE_RESPONSE)
-    {
-        return false;
-    }
-
-    *reg_id = parser->msg[HEADER_REG_INDEX];
-    *word_count = parser->msg[HEADER_WORD_COUNT_INDEX];
-    *map_id = (parser->msg[HEADER_MAP_ERR_INDEX] & 0xF0) >> 4;
-
-    return true;
 }
 
 void TtParserCopyMsgBody(TtParser *parser, void *dest)
@@ -174,6 +196,6 @@ void TtParserCopyMsgBody(TtParser *parser, void *dest)
     uint8_t reg_id = 0;
     uint8_t map_id = 0;
     uint8_t word_count = 0;
-    TtParserGetResponseInfo(parser, &map_id, &reg_id, &word_count);
+    TtParserGetHeaderInfo(parser, &map_id, &reg_id, &word_count);
     memcpy((uint8_t *)dest + reg_id, parser->msg + 4, word_count * 4);
 }
