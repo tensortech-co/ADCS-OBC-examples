@@ -16,12 +16,14 @@
 void ObcAppInit()
 {
 	BspAdcsInit();
+
+	BspAdcsSetCmgWTorqueUser(0, 0.8);
+	BspAdcsSetMode(MODE_MANUAL);
 }
 
 void ObcAppRoutine()
 {
 	BspAdcsTask();
-	HAL_Delay(1000);
 
 	reg_snid_t snid;
 	BspAdcsGetSNID(&snid);
@@ -29,14 +31,14 @@ void ObcAppRoutine()
 	HAL_Delay(10);
 
 
+	uint8_t log[40];
+	int len;
+
 	reg_imux_s_t imu_s;
 	BspAdcsGetIMUx_S(0, &imu_s);
-
-	char imu_buffer[40];
-	int len;
-	len = snprintf(imu_buffer, sizeof(imu_buffer),
+	len = snprintf((char *)log, sizeof(log),
 			", omega = %.4f, %.4f, %.4f \r\n",
 			imu_s.omega_BN_S[0], imu_s.omega_BN_S[1], imu_s.omega_BN_S[2]);
-	HAL_UART_Transmit(&huart3, imu_buffer, 40, 10);
+	HAL_UART_Transmit(&huart3, log, len, 10);
 	HAL_Delay(50);
 }

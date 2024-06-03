@@ -43,6 +43,6 @@ void TtParserInit(TtParser* parser, uint8_t factory_id);
 bool TtParserUpdate(TtParser *parser, const uint8_t c);
 TtMsgType TtParserGetMsgType(TtParser *parser);
 void TtParserGetHeaderInfo(TtParser *parser, uint8_t* map_id, uint8_t* reg_id, uint8_t* word_count);
-void TtParserCopyMsgBody(TtParser *parser, void *dest);
+void TtParserCopyMsgBody(TtParser *parser, void *dest, uint8_t reg_id, uint16_t word_count);
 
 #endif // TT_PARSER_H_
