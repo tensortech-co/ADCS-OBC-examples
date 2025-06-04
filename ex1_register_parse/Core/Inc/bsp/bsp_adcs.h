@@ -26,19 +26,23 @@ typedef enum
 	MODE_MANUAL = 7,
 } ConfMode;
 
+typedef struct bsp_adcs
+{
+	reg_imu_stat_t IMU_STAT;
+	reg_imux_s_t IMU_S[ADCS_XM_IMU_NUM];
+} BspAdcsImuData;
+
 void BspAdcsInit();
 void BspAdcsTask();
 
-// User Map
-void BspAdcsGetSNID(reg_snid_t *snid);
-bool BspAdcsSetMode(ConfMode mode);
+/* ----- User Map getters ----- */ 
 
-bool BspAdcsSetCmgGRateUser(uint8_t id, float gimbal_rate);
-bool BspAdcsSetCmgWTorqueUser(uint8_t id, float wheel_torque);
+void BspAdcsGetFact(Fact *fact);
+void BspAdcsGetSNID(Snid *snid);
+void BspAdcsGetSTAT(AdcsXStat *status);
 
-void BspAdcsGetSTAT(reg_status_t *status);
+/* ----- Sen/Act Map getters ----- */
 
-// Sen/Act Map
-void BspAdcsGetIMUx_S(uint8_t id, reg_imux_s_t *imu_s);
+void BspAdcsGetImuData(BspAdcsImuData *data);
 
 #endif /* INC_BSP_BSP_ADCS_H_ */

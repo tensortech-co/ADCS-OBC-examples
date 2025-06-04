@@ -19,7 +19,7 @@
 static reg_adcs register_adcs;
 static TtParser parser;
 static uint8_t rx_buffer;
-static uint8_t command[9];
+static uint8_t command[128];
 
 // private function declare
 
@@ -79,105 +79,46 @@ void BspAdcsTask()
 	// User map
 	command[0] = 0xc9;
 	command[1] = 0x00;
-	command[2] = 0xA2;
+	command[2] = USER_MAP_TOTAL_WORD;
 	command[3] = 0x00;
-	command[4] = 0x95;
+	command[4] = generateChecksum(command, 4);
 	HAL_UART_Transmit_IT(&huart2,  command, 5);
 	HAL_Delay(100);
 
 	// Sensor/ Actuator map
 	command[0] = 0xc9;
 	command[1] = 0x00;
-	command[2] = 0x62;
+	command[2] = SENACT_MAP_TOTAL_WORD;
 	command[3] = 0x10;
-	command[4] = 0xc5;
+	command[4] = generateChecksum(command, 4);
 	HAL_UART_Transmit_IT(&huart2,  command, 5);
 	HAL_Delay(100);
 }
 
-void BspAdcsGetSNID(reg_snid_t *snid)
+/* ----- User map getters ----- */
+
+void BspAdcsGetFact(Fact *fact)
+{
+	*fact = register_adcs.user_map.FACT;
+}
+
+void BspAdcsGetSNID(Snid *snid)
 {
 	*snid = register_adcs.user_map.SNID;
 }
 
-bool BspAdcsSetMode(ConfMode mode)
-{
-	bool result;
-	uint8_t checksum = 0x00;
-	command[0] = 0xc8;
-	command[1] = 0x04;
-	command[2] = 0x01;
-	command[3]= 0x00;
-	command[4] = mode; // mode
-	command[5] = 0x00;
-	command[6] = 0x00;
-	command[7] = 0x00;
-	command[8] = 0x00;
-
-	checksum = generateChecksum(command, 9);
-	command[8] = checksum;
-
-	result = (HAL_UART_Transmit_IT(&huart2,  command, 9) == HAL_OK);
-	HAL_Delay(10);
-	return result;
-}
-
-bool BspAdcsSetCmgGRateUser(uint8_t id, float gimbal_rate)
-{
-	bool result;
-	uint8_t checksum = 0x00;
-	uint8_t data[4];
-	memcpy(data, &gimbal_rate, 4);
-
-	command[0] = 0xc8;
-	command[1] = 0x6a + 2*id;
-	command[2] = 0x01;
-	command[3] = 0x00;
-	command[4] = data[0];
-	command[5] = data[1];
-	command[6] = data[2];
-	command[7] = data[3];
-	command[8] = 0x00;
-
-	checksum = generateChecksum(command, 9);
-	command[8] = checksum;
-
-	result = (HAL_UART_Transmit_IT(&huart2,  command, 9) == HAL_OK);
-	HAL_Delay(10);
-	return result;
-}
-
-bool BspAdcsSetCmgWTorqueUser(uint8_t id, float wheel_torque)
-{
-	bool result;
-	uint8_t checksum = 0x00;
-	uint8_t data[4];
-	memcpy(data, &wheel_torque, 4);
-
-	command[0] = 0xc8;
-	command[1] = 0x6b + 2*id;
-	command[2] = 0x01;
-	command[3] = 0x00;
-	command[4] = data[0];
-	command[5] = data[1];
-	command[6] = data[2];
-	command[7] = data[3];
-	command[8] = 0x00;
-
-	checksum = generateChecksum(command, 9);
-	command[8] = checksum;
-
-	result = (HAL_UART_Transmit_IT(&huart2,  command, 9) == HAL_OK);
-	HAL_Delay(10);
-	return result;
-}
-
-void BspAdcsGetSTAT(reg_status_t *status)
+void BspAdcsGetSTAT(AdcsXStat *status)
 {
 	*status = register_adcs.user_map.STAT;
 }
 
-void BspAdcsGetIMUx_S(uint8_t id, reg_imux_s_t *imu_s)
+/* ----- Sen/Act map getters ----- */
+
+void BspAdcsGetImuData(BspAdcsImuData *data)
 {
-	*imu_s = register_adcs.sen_act_map.IMU_DATA[id];
+	data->IMU_STAT = register_adcs.sen_act_map.IMU_STAT;
+	for (uint8_t i = 0; i < ADCS_XM_IMU_NUM; i++)
+	{
+		data->IMU_S[i] = register_adcs.sen_act_map.IMU_S[i];
+	}
 }

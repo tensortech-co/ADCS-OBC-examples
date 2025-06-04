@@ -49,9 +49,10 @@
 									<listOptionValue builtIn="false" value="../Drivers/STM32H7xx_HAL_Driver/Inc/Legacy"/>
 									<listOptionValue builtIn="false" value="../Drivers/CMSIS/Device/ST/STM32H7xx/Include"/>
 									<listOptionValue builtIn="false" value="../Drivers/CMSIS/Include"/>
-									<listOptionValue builtIn="false" value="&quot;C:\Users\henry\Documents\git_space\ADCS-OBC-examples\ex1_register_parse\Core\Inc\tt_parser&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;C:\Users\henry\Documents\git_space\ADCS-OBC-examples\ex1_register_parse\Core\Inc\app&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;C:\Users\henry\Documents\git_space\ADCS-OBC-examples\ex1_register_parse\Core\Inc\bsp&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;C:\Users\henry\Documents\git_space\ADCS-OBC-examples\ex1_register_parse\Core\Inc\register&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;C:\Users\henry\Documents\git_space\ADCS-OBC-examples\ex1_register_parse\Core\Inc\tt_parser&quot;"/>
 								</option>
 								<inputType id="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.c.compiler.input.c.1307438723" superClass="com.st.stm32cube.ide.mcu.gnu.managedbuild.tool.c.compiler.input.c"/>
 							</tool>

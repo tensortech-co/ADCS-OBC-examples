@@ -13,32 +13,38 @@
 
 #include <stdio.h>
 
+static uint8_t obc_log[128];
+
+
 void ObcAppInit()
 {
 	BspAdcsInit();
-
-	BspAdcsSetCmgWTorqueUser(0, 0.8);
-	BspAdcsSetMode(MODE_MANUAL);
 }
 
 void ObcAppRoutine()
 {
 	BspAdcsTask();
 
-	reg_snid_t snid;
-	BspAdcsGetSNID(&snid);
-	HAL_UART_Transmit(&huart3, snid.raw_u8, 10, 10);
-	HAL_Delay(10);
-
-
-	uint8_t log[40];
+	Fact fact;
+	Snid snid;
 	int len;
+	BspAdcsImuData data;
 
-	reg_imux_s_t imu_s;
-	BspAdcsGetIMUx_S(0, &imu_s);
-	len = snprintf((char *)log, sizeof(log),
-			", omega = %.4f, %.4f, %.4f \r\n",
-			imu_s.omega_BN_S[0], imu_s.omega_BN_S[1], imu_s.omega_BN_S[2]);
-	HAL_UART_Transmit(&huart3, log, len, 10);
+	BspAdcsGetFact(&fact);
+	BspAdcsGetSNID(&snid);
+	BspAdcsGetImuData(&data);
+
+	// Print some log
+	len = snprintf((char *)obc_log, sizeof(obc_log),
+			"FW Ver: %d.%d.%d, SNID: %s \r\n",
+			fact.bits.major, fact.bits.minor, fact.bits.patch, snid.raw_u8);
+	HAL_UART_Transmit(&huart3, obc_log, len, 20);
 	HAL_Delay(50);
+
+	len = snprintf((char *)obc_log, sizeof(obc_log),
+			"IMU0: %.4f, %.4f, %.4f [rad/s] \r\nIMU1: %.4f, %.4f, %.4f [rad/s] \r\n",
+			data.IMU_S[0].omega_BN_S[0], data.IMU_S[0].omega_BN_S[1], data.IMU_S[0].omega_BN_S[2],
+			data.IMU_S[1].omega_BN_S[0], data.IMU_S[1].omega_BN_S[1], data.IMU_S[1].omega_BN_S[2]);
+	HAL_UART_Transmit(&huart3, obc_log, len, 20);
+	HAL_Delay(1000);
 }
