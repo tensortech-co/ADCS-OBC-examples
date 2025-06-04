@@ -23,6 +23,11 @@ static uint8_t command[128];
 
 // private function declare
 
+static uint8_t generateChecksum(const uint8_t *buf, uint16_t len);
+static void bspAdcsRxCallback();
+
+// private function implement
+
 uint8_t generateChecksum(const uint8_t *buf, uint16_t len)
 {
   uint8_t sum = 0;
@@ -33,44 +38,40 @@ uint8_t generateChecksum(const uint8_t *buf, uint16_t len)
  return (0xFF - sum + 1);
 }
 
-
-// weak function overwrite
-
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+void bspAdcsRxCallback()
 {
 	uint8_t map_id;
 	uint8_t word_count;
 	uint8_t reg_id;
-	if (huart->Instance == USART2)
+
+	if (TtParserUpdate(&parser, rx_buffer))
 	{
-		if (TtParserUpdate(&parser, rx_buffer))
+		if (READ_RESPONSE == TtParserGetMsgType(&parser))
 		{
-			if (READ_RESPONSE == TtParserGetMsgType(&parser))
+			TtParserGetHeaderInfo(&parser, &map_id, &reg_id, &word_count);
+			switch(map_id)
 			{
-				TtParserGetHeaderInfo(&parser, &map_id, &reg_id, &word_count);
-				switch(map_id)
-				{
-				case 0:
-					TtParserCopyMsgBody(&parser, &register_adcs.user_map, reg_id, word_count);
-					break;
-				case 1:
-					TtParserCopyMsgBody(&parser, &register_adcs.sen_act_map, reg_id, word_count);
-					break;
-				case 2:
-					TtParserCopyMsgBody(&parser, &register_adcs.param_map, reg_id, word_count);
-					break;
-				}
+			case 0:
+				TtParserCopyMsgBody(&parser, &register_adcs.user_map, reg_id, word_count);
+				break;
+			case 1:
+				TtParserCopyMsgBody(&parser, &register_adcs.sen_act_map, reg_id, word_count);
+				break;
+			case 2:
+				TtParserCopyMsgBody(&parser, &register_adcs.param_map, reg_id, word_count);
+				break;
 			}
 		}
-		HAL_UART_Receive_IT(huart, &rx_buffer, 1); // You need to toggle a breakpoint on this line!
 	}
+	HAL_UART_Receive_IT(&huart2, &rx_buffer, 1); // You need to toggle a breakpoint on this line!
 }
 
-// private function implement
+// public function implement
 
 void BspAdcsInit()
 {
 	TtParserInit(&parser, 0x64);
+	HAL_UART_RegisterCallback(&huart2, HAL_UART_RX_COMPLETE_CB_ID, bspAdcsRxCallback);
 	HAL_UART_Receive_IT(&huart2, &rx_buffer, 1);
 }
 
